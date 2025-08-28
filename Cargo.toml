@@ -1,5 +1,5 @@
 [package]
-name = "tcg-rs"
+name = "tcg-log-core-rs"
 version = "0.1.0"
 edition = "2024"
 
