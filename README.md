@@ -1,4 +1,4 @@
-# tcg-rs
+# tcg-log-core-rs
 
 A small, zero-std-alloc parsing iterator for Trusted Computing Group (TCG) Windows Boot Configuration Logs (WBCL). It provides a safe, idiomatic Rust wrapper for iterating through PCR event entries from a WBCL buffer, supporting legacy PC Client (TCG1.2) and TCG2 formats with multiple digest algorithms.
 
@@ -21,7 +21,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tcg-rs = "0.1"
+tcg-log-core-rs = "0.1"
 ```
 
 Rust edition: 2024.
@@ -30,36 +30,15 @@ Rust edition: 2024.
 The API works over an in-memory WBCL buffer, commonly read from a file (on Windows, for example, from the WBCL exported by system tools).
 
 ```rust
-use tcg_rs::{
-    wbcl_api_init_iterator,
-    wbcl_api_move_to_next_element,
-    wbcl_api_get_current_element,
-};
+use tcg_log_core_rs::{parse, EventRecord};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Replace with an actual WBCL path or buffer source
-    let buffer = std::fs::read("path\\to\\your.wbcl")?;
+    let path = "path\\to\\your.wbcl";
+    let events: Vec<EventRecord> = parse(path)?;
 
-    let mut it = wbcl_api_init_iterator(&buffer)
-        .map_err(|code| format!("failed to init WBCL iterator, error=0x{code:08x}"))?;
-
-    while it.has_next() {
-        wbcl_api_move_to_next_element(&mut it)
-            .map_err(|code| format!("failed to move to next element, error=0x{code:08x}"))?;
-
-        let (pcr_index, event_type, digest_opt, data_size, data_opt) =
-            wbcl_api_get_current_element(&it)
-                .map_err(|code| format!("failed to get current element, error=0x{code:08x}"))?;
-
-        println!(
-            "PCR: {pcr_index}, EventType: 0x{event_type:x}, DigestLen: {}, DataLen: {}",
-            digest_opt.map(|d| d.len()).unwrap_or(0),
-            data_size
-        );
-
-        // Optionally process digest and data slices
-        if let Some(d) = digest_opt { /* ... */ }
-        if let Some(ed) = data_opt { /* ... */ }
+    for e in events {
+        println!("PCR: {}, Type: 0x{:x}", e.pcr_index, e.event_type);
+        // access digests and event data via EventRecord fields
     }
 
     Ok(())
@@ -69,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Concepts and API
 
 ### Core Types
-- `WbclIterator<'a>`: Stateful iterator over a WBCL byte buffer. It validates headers, keeps current offset, and exposes helpers to read the current element.
+- `wbcl::WbclIterator<'a>`: Stateful iterator over a WBCL byte buffer (module path: `tcg_log_core_rs::wbcl`). It validates headers, keeps current offset, and exposes helpers to read the current element.
 
 ### Constructor
 - `WbclIterator::new(log_buffer: &'a [u8]) -> Result<Self, u32>`
@@ -84,9 +63,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   - When multiple digests are present (TCG2), this returns the combined/selected digest region for the current element. Consult the source for details.
 
 ### Convenience FFI-style Helpers
-- `wbcl_api_init_iterator(log_buffer: &[u8]) -> Result<WbclIterator, u32>`
-- `wbcl_api_get_current_element(iterator: &WbclIterator) -> Result<(u32, u32, Option<&[u8]>, u32, Option<&[u8]>), u32>`
-- `wbcl_api_move_to_next_element(iterator: &mut WbclIterator) -> Result<(), u32>`
+- `wbcl::wbcl_api_init_iterator(log_buffer: &[u8]) -> Result<WbclIterator, u32>`
+- `wbcl::wbcl_api_get_current_element(iterator: &WbclIterator) -> Result<(u32, u32, Option<&[u8]>, u32, Option<&[u8]>), u32>`
+- `wbcl::wbcl_api_move_to_next_element(iterator: &mut WbclIterator) -> Result<(), u32>`
 
 These mimic a C-FFI style interface and may be easier to integrate in some contexts.
 
